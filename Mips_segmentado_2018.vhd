@@ -318,7 +318,7 @@ Z <= '1' when (busA=busB) else '0';
 -- Ahora mismo sus salidas son 0 y no se usan en ningún sitio
 -------------------------------------------------------------------------------------
 
-Unidad_detención_riesgos: UD port map (	Reg_Rs_ID => Reg_Rs_ID, Reg_Rt_ID => Reg_Rt_ID, MemRead_EX => MemRead_EX, RW_EX => RW_EX, RegWrite_EX => RegWrite_EX,
+Unidad_detencion_riesgos: UD port map (	Reg_Rs_ID => Reg_Rs_ID, Reg_Rt_ID => Reg_Rt_ID, MemRead_EX => MemRead_EX, RW_EX => RW_EX, RegWrite_EX => RegWrite_EX,
 										RW_Mem => RW_Mem, RegWrite_Mem => RegWrite_Mem, IR_op_code => IR_op_code, PCSrc => PCSrc, FP_add_EX => FP_add_EX, FP_done => FP_done,
 										kill_IF => kill_IF, parar_ID => parar_ID, parar_EX => parar_EX );
 -------------------------------------------------------------------------------------
