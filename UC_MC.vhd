@@ -115,91 +115,153 @@ palabra <= palabra_UC;
 		-- No piden hacer nada          
         if (state = Inicio and RE= '0' and WE= '0') then
 			next_state <= Inicio;
-			ready <= '1';
-		end if;
 
 		-- Read, hit, clean
-		if (state = Inicio and RE= '1' and hit= '1' and dirty_bit= '0') then
+		elsif (state = Inicio and RE= '1' and hit= '1' and dirty_bit= '0') then
 			next_state <= Inicio;
-		end if;
+			MC_RE <= '1';
+			ready <= '1';
 
 		-- Write, hit, clean	
-		if (state = Inicio and WE= '1' and hit= '1' and dirty_bit= '0') then
+		elsif (state = Inicio and WE= '1' and hit= '1' and dirty_bit= '0') then
 			next_state <= Inicio;
-		end if;
+			MC_WE <= '1';
+			ready <= '1';
+			Update_dirty <= '1';
 
-		-- Miss, dirty, NO DevSel
-		if (state = Inicio and hit= '0' and dirty_bit= '1' and Bus_DevSel= '0') then
-			next_state <= CB_init;
-		end if;
-
-		-- Miss, dirty, SI DevSel
-		if (state = Inicio and hit= '0' and dirty_bit= '1' and Bus_DevSel= '1') then
-			next_state <= CB;
-		end if;
-
-		-- Miss, clean, NO DevSel
-		if (state = Inicio and hit= '0' and dirty_bit= '0' and Bus_DevSel= '0') then
+		-- Petición de Fetch. Esperando inicio de conexión con SLAVE.
+		-- Read/Write, miss, clean, NO DevSel
+		elsif (state = Inicio and (RE='1' or WE='1') and hit= '0' and dirty_bit= '0' and Bus_DevSel= '0') then
 			next_state <= RP_init;
-		end if;
+			bus_RE <= '1';
+			MC_send_addr <= '1';
+			Frame <= '1';
 
-		-- Miss, clean, SI DevSel
-		if (state = Inicio and hit= '0' and dirty_bit= '0' and Bus_DevSel= '1') then
+		-- Petición de Fetch. SLAVE responde en el mismo ciclo.
+		-- Read/Write, miss, clean, SI DevSel
+		elsif (state = Inicio and (RE='1' or WE='1') and hit= '0' and dirty_bit= '0' and Bus_DevSel= '1') then
 			next_state <= RP;
-		end if;
+			bus_RE <= '1';
+			Frame <= '1';
 
--- ESTADO CB_init
-		-- NO DevSel
-		if (state = CB_init and Bus_DevSel= '0') then
+		-- Petición de Copy-Back. Esperando inicio de conexión con SLAVE.
+		-- Read/Write, miss, dirty, NO DevSel (esperando inicio de conexión con SLAVE)
+		elsif (state = Inicio and (RE='1' or WE='1') and hit= '0' and dirty_bit= '1' and Bus_DevSel= '0') then
 			next_state <= CB_init;
-		end if;
+			bus_WE <= '1';
+			MC_send_addr <= '1';
+			Frame <= '1';
+			Send_dirty <= '1';
 
-		-- SI DevSel
-		if (state = CB_init and Bus_DevSel= '1') then
+		-- Petición de Copy-Back. SLAVE responde en el mismo ciclo.
+		-- Miss, dirty, SI DevSel
+		elsif (state = inicio and (RE='1' or WE='1') and hit= '0' and dirty_bit= '1' and Bus_DevSel= '1') then
 			next_state <= CB;
-		end if;
+			bus_WE <= '1';
+			Frame <= '1';
+			Send_dirty <= '1';
+
+-- ESTADO CB_init ()
+-- Esperando inicio de Copy-Back con SLAVE
+		-- SLAVE NO preparado
+		-- NO DevSel
+		elsif (state = CB_init and Bus_DevSel= '0') then
+			next_state <= CB_init;
+			bus_WE <= '1';
+			MC_send_addr <= '1';
+			Frame <= '1';
+			Send_dirty <= '1';
+
+		-- SLAVE preparado
+		-- SI DevSel
+		elsif (state = CB_init and Bus_DevSel= '1') then
+			next_state <= CB;
+			bus_WE <= '1';
+			Frame <= '1';
+			Send_dirty <= '1';
 
 -- ESTADO CB
+-- Copy-Back palabras 0 a 3		
+		-- SLAVE NO preparado
 		-- NO TRDY
-		if (state = CB and bus_TRDY= '0') then
+		elsif (state = CB and bus_TRDY= '0') then
 			next_state <= CB;
-		end if;
+			MC_RE <= '1';
+			bus_WE <= '1';
+			mux_origen <= '1'; -- Seleccionar señal de "palabra_UC"
+			MC_send_data <= '1';
+			Frame <= '1';
+			Send_dirty <= '1';
 
+		-- SLAVE preparado AND palabra < 3
 		-- SI TRDY, NO last_word
-		if (state = CB and bus_TRDY= '1' and last_word= '0') then
+		elsif (state = CB and bus_TRDY= '1' and last_word= '0') then
 			next_state <= CB;
-		end if;
+			MC_RE <= '1';
+			bus_WE <= '1';
+			mux_origen <= '1'; -- Seleccionar señal de "palabra_UC"
+			MC_send_data <= '1';
+			Frame <= '1';
+			Send_dirty <= '1';
+			count_enable <= '1'; -- Siguiente palabra
 
+		-- SLAVE preparado AND palabra == 3
 		-- SI TRDY, SI last_word
-		if (state = CB and bus_TRDY= '1' and last_word= '1') then
+		elsif (state = CB and bus_TRDY= '1' and last_word= '1') then
 			next_state <= RP_init;
-		end if;
+			MC_RE <= '1';
+			bus_WE <= '1';
+			mux_origen <= '1'; -- Seleccionar señal de "palabra_UC"
+			MC_send_data <= '1';
+			Send_dirty <= '1';
+			count_enable <= '1'; -- Regresar a 0
 
 -- ESTADO RP_init
+-- Esperando inicio de Fetch con SLAVE
 		-- NO DevSel
-		if (state = RP_init and Bus_DevSel= '0') then
+		elsif (state = RP_init and Bus_DevSel= '0') then
 			next_state <= RP_init;
-		end if;
+			bus_RE <= '1';
+			MC_send_addr <= '1';
+			Frame <= '1';
 
 		-- SI DevSel
-		if (state = RP_init and Bus_DevSel= '1') then
+		elsif (state = RP_init and Bus_DevSel= '1') then
 			next_state <= RP;
-		end if;
+			bus_RE <= '1';
+			Frame <= '1';
 
 -- ESTADO RP
+-- Fetch palabras 0 a 3
+		-- SLAVE NO preparado
 		-- NO TRDY
-		if (state = RP and bus_TRDY= '0') then
+		elsif (state = RP and bus_TRDY= '0') then
 			next_state <= RP;
-		end if;
+			bus_RE <= '1';
+			mux_origen <= '1';
+			Frame <= '1';
 
+		-- SLAVE NO preparado AND palabra < 3
 		-- SI TRDY, NO last_word
-		if (state = RP and bus_TRDY= '1' and last_word= '0') then
+		elsif (state = RP and bus_TRDY= '1' and last_word= '0') then
 			next_state <= RP;
-		end if;
+			MC_WE <= '1';
+			bus_RE <= '1';
+			mux_origen <= '1';
+			Frame <= '1';
+			count_enable <= '1';
 
+		-- SLAVE NO preparado AND palabra == 3
 		-- SI TRDY, SI last_word
-		if (state = RP and bus_TRDY= '1' and last_word= '1') then
+		elsif (state = RP and bus_TRDY= '1' and last_word= '1') then
 			next_state <= Inicio;
+			MC_WE <= '1';
+			bus_RE <= '1';
+			MC_tags_WE <= '1';
+			mux_origen <= '1';
+			Replace_block <= '1';
+			Frame <= '1';
+			count_enable <= '1';
 		end if;
 
    end process;
