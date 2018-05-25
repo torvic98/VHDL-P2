@@ -44,7 +44,7 @@ ARCHITECTURE behavior OF Test_MD IS
          Bus_RE : IN  std_logic;
          Bus_AD : IN  std_logic_vector(31 downto 0);
          MD_Bus_DEVsel : OUT  std_logic;
-         MD_Bus_TDRY : OUT  std_logic;
+         MD_Bus_TRDY : OUT  std_logic;
          MD_send_data : OUT  std_logic;
          MD_Dout : OUT  std_logic_vector(31 downto 0)
         );
@@ -61,7 +61,7 @@ ARCHITECTURE behavior OF Test_MD IS
 
  	--Outputs
    signal MD_Bus_DEVsel : std_logic;
-   signal MD_Bus_TDRY : std_logic;
+   signal MD_Bus_TRDY : std_logic;
    signal MD_send_data : std_logic;
    signal MD_Dout : std_logic_vector(31 downto 0);
 
@@ -79,7 +79,7 @@ BEGIN
           Bus_RE => Bus_RE,
           Bus_AD => Bus_AD,
           MD_Bus_DEVsel => MD_Bus_DEVsel,
-          MD_Bus_TDRY => MD_Bus_TDRY,
+          MD_Bus_TRDY => MD_Bus_TRDY,
           MD_send_data => MD_send_data,
           MD_Dout => MD_Dout
         );
@@ -116,19 +116,19 @@ BEGIN
 		wait until  MD_Bus_DEVsel = '1';
 		Bus_AD 		<= x"00000001"; --ponemos el primer dato
 		wait for 1 ns;
-		wait until MD_Bus_TDRY ='1'; --esperamos a que nos digan que lo pueden coger
+		wait until MD_Bus_TRDY ='1'; --esperamos a que nos digan que lo pueden coger
 		wait until CLK'event and CLK = '1'; -- esperamos a que llegue un flanco para que lo procesen
 		Bus_AD 		<= x"00000002"; --ponemos el segundo dato
 		wait for 1 ns;
-		wait until MD_Bus_TDRY ='1'; --esperamos a que nos digan que lo pueden coger
+		wait until MD_Bus_TRDY ='1'; --esperamos a que nos digan que lo pueden coger
 		wait until CLK'event and CLK = '1'; -- esperamos a que llegue un flanco para que lo procesen
 		Bus_AD 		<= x"00000003"; --ponemos el tercer dato
 		wait for 1 ns;
-		wait until MD_Bus_TDRY ='1'; --esperamos a que nos digan que lo pueden coger
+		wait until MD_Bus_TRDY ='1'; --esperamos a que nos digan que lo pueden coger
 		wait until CLK'event and CLK = '1'; -- esperamos a que llegue un flanco para que lo procesen
 		Bus_AD 		<= x"00000004"; --ponemos el cuarto dato
 		wait for 1 ns;
-		wait until MD_Bus_TDRY ='1'; --esperamos a que nos digan que lo pueden coger
+		wait until MD_Bus_TRDY ='1'; --esperamos a que nos digan que lo pueden coger
 		wait until CLK'event and CLK = '1'; -- esperamos a que llegue un flanco para que lo procesen
 		Bus_Frame 	<= '0'; --decimos que ya hemos terminado
 		Bus_AD 		<= x"00000005"; --No debería escribirse
