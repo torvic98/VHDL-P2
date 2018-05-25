@@ -14,7 +14,7 @@
 --
 -- Revision: 
 -- Revision 0.01 - File Created
--- Additional Comments: la UC incluye un contador de 2 bits para llevar la cuenta de las transferencias de bloque y una máquina de estados
+-- Additional Comments: la UC incluye un contador de 2 bits para llevar la cuenta de las transferencias de bloque y una mÃ¡quina de estados
 --
 ----------------------------------------------------------------------------------
 library IEEE;
@@ -36,19 +36,19 @@ entity UC_MC is
 			WE : in  STD_LOGIC;
 			hit : in  STD_LOGIC; --se activa si hay acierto
 			dirty_bit : in  STD_LOGIC; --avisa si el bloque a reemplazar es sucio
-			bus_TRDY : in  STD_LOGIC; --indica que la memoria no puede realizar la operación solicitada en este ciclo
-			Bus_DevSel: in  STD_LOGIC; --indica que la memoria ha reconocido que la dirección está dentro de su rango
+			bus_TRDY : in  STD_LOGIC; --indica que la memoria no puede realizar la operaciÃ³n solicitada en este ciclo
+			Bus_DevSel: in  STD_LOGIC; --indica que la memoria ha reconocido que la direcciÃ³n estÃ¡ dentro de su rango
 			MC_RE : out  STD_LOGIC; --RE y WE de la MC
             MC_WE : out  STD_LOGIC;
             bus_RE : out  STD_LOGIC; --RE y WE de la MC
             bus_WE : out  STD_LOGIC;
             MC_tags_WE : out  STD_LOGIC; -- para escribir la etiqueta en la memoria de etiquetas
-            palabra : out  STD_LOGIC_VECTOR (1 downto 0);--indica la palabra actual dentro de una transferencia de bloque (1ª, 2ª...)
-            mux_origen: out STD_LOGIC; -- Se utiliza para elegir si el origen de la dirección y el dato es el Mips (cuando vale 0) o la UC y el bus (cuando vale 1)
-            ready : out  STD_LOGIC; -- indica si podemos procesar la orden actual del MIPS en este ciclo. En caso contrario habrá que detener el MIPs
-            MC_send_addr : out  STD_LOGIC; --ordena que se envíen la dirección y las señales de control al bus
-            MC_send_data : out  STD_LOGIC; --ordena que se envíen los datos
-            Frame : out  STD_LOGIC; --indica que la operación no ha terminado
+            palabra : out  STD_LOGIC_VECTOR (1 downto 0);--indica la palabra actual dentro de una transferencia de bloque (1Âª, 2Âª...)
+            mux_origen: out STD_LOGIC; -- Se utiliza para elegir si el origen de la direcciÃ³n y el dato es el Mips (cuando vale 0) o la UC y el bus (cuando vale 1)
+            ready : out  STD_LOGIC; -- indica si podemos procesar la orden actual del MIPS en este ciclo. En caso contrario habrÃ¡ que detener el MIPs
+            MC_send_addr : out  STD_LOGIC; --ordena que se envÃ­en la direcciÃ³n y las seÃ±ales de control al bus
+            MC_send_data : out  STD_LOGIC; --ordena que se envÃ­en los datos
+            Frame : out  STD_LOGIC; --indica que la operaciÃ³n no ha terminado
 			Send_dirty	: out  STD_LOGIC; --indica que hay que enviar el bloque sucio por el bus
 			Update_dirty	: out  STD_LOGIC; --indica que hay que actualizar el bit dirty
 			Replace_block	: out  STD_LOGIC -- indica que se ha reemplzado un bloque
@@ -65,18 +65,18 @@ component counter_2bits is
 		           count : out  STD_LOGIC_VECTOR (1 downto 0)
 					  );
 end component;		           
-type state_type is (Inicio, CB_init, CB, RP_init, RP); -- Poner aquí el nombre de los estados. Usad nombres descriptivos
+type state_type is (Inicio, CB_init, CB, RP_init, RP); -- Poner aquÃ­ el nombre de los estados. Usad nombres descriptivos
 signal state, next_state : state_type; 
-signal last_word: STD_LOGIC; --se activa cuando se está pidiendo la última palabra de un bloque
+signal last_word: STD_LOGIC; --se activa cuando se estÃ¡ pidiendo la Ãºltima palabra de un bloque
 signal count_enable: STD_LOGIC; -- se activa si se ha recibido una palabra de un bloque para que se incremente el contador de palabras
 signal palabra_UC : STD_LOGIC_VECTOR (1 downto 0);
 begin
  
  
 --el contador nos dice cuantas palabras hemos recibido. Se usa para saber cuando se termina la transferencia del bloque y para direccionar la palabra en la que se escribe el dato leido del bus en la MC
-word_counter: counter_2bits port map (clk, reset, count_enable, palabra_UC); --indica la palabra actual dentro de una transferencia de bloque (1ª, 2ª...)
+word_counter: counter_2bits port map (clk, reset, count_enable, palabra_UC); --indica la palabra actual dentro de una transferencia de bloque (1Âª, 2Âª...)
 
-last_word <= '1' when palabra_UC="11" else '0';--se activa cuando estamos pidiendo la última palabra
+last_word <= '1' when palabra_UC="11" else '0';--se activa cuando estamos pidiendo la Ãºltima palabra
 
 palabra <= palabra_UC;
 
@@ -94,12 +94,12 @@ palabra <= palabra_UC;
    --MEALY State-Machine - Outputs based on state and inputs
    OUTPUT_DECODE: process (state, hit, last_word, bus_TRDY, RE, WE, dirty_bit, Bus_DevSel)
    begin
-			  -- valores por defecto, si no se asigna otro valor en un estado valdrán lo que se asigna aquí
+			  -- valores por defecto, si no se asigna otro valor en un estado valdrÃ¡n lo que se asigna aquÃ­
 		MC_WE <= '0';
 		bus_RE <= '0';
 		bus_WE <= '0';
         MC_tags_WE <= '0';
-        MC_RE <= RE;--leemos en la cache si se solicita una lectura de una instrucción
+        MC_RE <= RE;--leemos en la cache si se solicita una lectura de una instrucciÃ³n
         ready <= '0';
         mux_origen <= '0';
         MC_send_addr <= '0';
