@@ -25,7 +25,7 @@ begin
 	Parar_ID_BEQ <= '1' when (IR_op_code="000100" and ( (Reg_Rs_ID=RW_EX and RegWrite_EX='1') or (Reg_Rt_ID=RW_EX and RegWrite_EX='1')
 	                       or (Reg_Rs_ID=RW_MEM and RegWrite_MEM='1') or (Reg_Rt_ID=RW_MEM and RegWrite_MEM='1') ) )
 				else '0';
-	Parar_ID_UA <= '1' when (MemRead_EX='1' and (RW_EX=Reg_Rs_ID or RW_EX=Reg_Rt_ID)) else '0';
+	Parar_ID_UA <= '1' when (MemRead_EX='1' and (RW_EX=Reg_Rs_ID or (RW_EX=Reg_Rt_ID and not IR_op_code="000010"))) else '0';
 	Parar_EX_ADDFP <= '1' when (FP_add_EX='1' and FP_done='0') else '0';
 	Kill_IF <= PCSrc and not (Parar_ID_BEQ or Parar_ID_UA or Parar_EX_ADDFP);
 	Parar_ID <= Parar_ID_BEQ or Parar_ID_UA;
