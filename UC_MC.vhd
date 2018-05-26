@@ -99,7 +99,7 @@ palabra <= palabra_UC;
 		bus_RE <= '0';
 		bus_WE <= '0';
         MC_tags_WE <= '0';
-        MC_RE <= RE;--leemos en la cache si se solicita una lectura de una instrucción
+        MC_RE <= '0';
         ready <= '0';
         mux_origen <= '0';
         MC_send_addr <= '0';
@@ -117,13 +117,13 @@ palabra <= palabra_UC;
 			next_state <= Inicio;
 
 		-- Read, hit, clean
-		elsif (state = Inicio and RE= '1' and hit= '1' and dirty_bit= '0') then
+		elsif (state = Inicio and RE= '1' and hit= '1') then
 			next_state <= Inicio;
 			MC_RE <= '1';
 			ready <= '1';
 
 		-- Write, hit, clean	
-		elsif (state = Inicio and WE= '1' and hit= '1' and dirty_bit= '0') then
+		elsif (state = Inicio and WE= '1' and hit= '1') then
 			next_state <= Inicio;
 			MC_WE <= '1';
 			ready <= '1';
@@ -266,6 +266,7 @@ palabra <= palabra_UC;
 			bus_RE <= '1';
 			MC_tags_WE <= '1';
 			mux_origen <= '1';
+			Update_dirty <= '1';
 			Replace_block <= '1';
 			Frame <= '1';
 			count_enable <= '1';
