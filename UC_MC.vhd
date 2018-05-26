@@ -65,7 +65,7 @@ component counter_2bits is
 		           count : out  STD_LOGIC_VECTOR (1 downto 0)
 					  );
 end component;		           
-type state_type is (Inicio, CB_init, CB, RP_init, RP); -- Poner aquí el nombre de los estados. Usad nombres descriptivos
+type state_type is (Inicio, CB_init, CB, CB_end, RP_init, RP, RP_end); -- Poner aquí el nombre de los estados. Usad nombres descriptivos
 signal state, next_state : state_type; 
 signal last_word: STD_LOGIC; --se activa cuando se está pidiendo la última palabra de un bloque
 signal count_enable: STD_LOGIC; -- se activa si se ha recibido una palabra de un bloque para que se incremente el contador de palabras
@@ -208,13 +208,20 @@ palabra <= palabra_UC;
 		-- SLAVE preparado AND palabra == 3
 		-- SI TRDY, SI last_word
 		elsif (state = CB and bus_TRDY= '1' and last_word= '1') then
-			next_state <= RP_init;
+			next_state <= CB_end;
 			MC_RE <= '1';
 			bus_WE <= '1';
 			mux_origen <= '1'; -- Seleccionar señal de "palabra_UC"
 			MC_send_data <= '1';
+			Frame <= '1';
 			Send_dirty <= '1';
 			count_enable <= '1'; -- Regresar a 0
+
+-- ESTADO CB_end
+-- Gap entre transferencias
+		elsif (state = CB_end) then
+			next_state <= RP_init;
+
 
 -- ESTADO RP_init
 -- Esperando inicio de Fetch con SLAVE
@@ -254,7 +261,7 @@ palabra <= palabra_UC;
 		-- SLAVE NO preparado AND palabra == 3
 		-- SI TRDY, SI last_word
 		elsif (state = RP and bus_TRDY= '1' and last_word= '1') then
-			next_state <= Inicio;
+			next_state <= RP_end;
 			MC_WE <= '1';
 			bus_RE <= '1';
 			MC_tags_WE <= '1';
@@ -262,6 +269,22 @@ palabra <= palabra_UC;
 			Replace_block <= '1';
 			Frame <= '1';
 			count_enable <= '1';
+
+-- ESTADO RP_end
+-- Repetir accesos a caché
+		-- REPETIR lectura
+		elsif (state = RP_end and RE= '1') then
+			next_state <= Inicio;
+			MC_RE <= '1';
+			ready <= '1';
+
+		-- REPETIR escritura
+		elsif (state = RP_end and WE= '1') then
+			next_state <= Inicio;
+			MC_WE <= '1';
+			ready <= '1';
+			Update_dirty <= '1';
+
 		end if;
 
    end process;
