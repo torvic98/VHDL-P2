@@ -43,13 +43,16 @@ component mux2_1 is
            Dout : out  STD_LOGIC_VECTOR (31 downto 0));
 end component;
 
-component memoriaRAM_D is port (
-		  CLK : in std_logic;
-		  ADDR : in std_logic_vector (31 downto 0); --Dir 
-          Din : in std_logic_vector (31 downto 0);--entrada de datos para el puerto de escritura
-          WE : in std_logic;		-- write enable	
-		  RE : in std_logic;		-- read enable		  
-		  Dout : out std_logic_vector (31 downto 0));
+component MD_mas_MC is port (
+      CLK : in std_logic;
+      reset: in std_logic; 
+      ADDR : in std_logic_vector (31 downto 0); --Dir solicitada por el Mips
+        Din : in std_logic_vector (31 downto 0);--entrada de datos desde el Mips
+        WE : in std_logic;    -- write enable del MIPS
+      RE : in std_logic;    -- read enable del MIPS 
+      Mem_ready: out std_logic; -- indica si podemos hacer la operación solicitada en el ciclo actual
+      Dout : out std_logic_vector (31 downto 0) --dato que se envía al Mips
+      ); --salida que puede leer el MIPS
 end component;
 
 component memoriaRAM_I is port (
@@ -117,13 +120,17 @@ component UD is
 			RW_EX			: in  STD_LOGIC_VECTOR (4 downto 0);
 			RegWrite_Mem	: in std_logic;-- informacion sobre la instruccion en Mem (destino y si escribe en registro)
 			RW_Mem			: in  STD_LOGIC_VECTOR (4 downto 0);
+      MemWrite_MEM  : in std_logic; -- informacion sobre si se lee o escribe en memoria
+      MemRead_MEM : in std_logic;
+      Mem_ready   : in std_logic; -- informacion sobre si hay que esperar (0) o no (1) a la MC
 			IR_op_code	: in  STD_LOGIC_VECTOR (5 downto 0); -- código de operación de la instrucción en IEEE
             PCSrc			: in std_logic; -- 1 cuando se produce un salto 0 en caso contrario
 			FP_add_EX	: in std_logic; -- Indica si la instrucción en EX es un ADDFP
 			FP_done		: in std_logic; -- Informa cuando la operación de suma en FP ha terminado
 			Kill_IF		: out  STD_LOGIC; -- Indica que la instrucción en IF no debe ejecutarse (fallo en la predicción de salto tomado)
 			Parar_ID		: out  STD_LOGIC; -- Indica que las etapas ID y previas deben parar
-			Parar_EX		: out  STD_LOGIC); -- Indica que las etapas EX y previas deben parar
+			Parar_EX		: out  STD_LOGIC; -- Indica que las etapas EX y previas deben parar
+      Parar_MEM   : out  STD_LOGIC); -- Indica que las etapas MEM y previas deben parar
 end component;
 
 COMPONENT Banco_EX
@@ -257,6 +264,7 @@ COMPONENT Banco_MEM
 CONSTANT ARIT : STD_LOGIC_VECTOR (5 downto 0) := "000001";
 signal load_PC, PCSrc, RegWrite_ID, RegWrite_EX, RegWrite_MEM, RegWrite_WB, Z, Branch, RegDst_ID, RegDst_EX, ALUSrc_ID, ALUSrc_EX: std_logic;
 signal MemtoReg_ID, MemtoReg_EX, MemtoReg_MEM, MemtoReg_WB, MemWrite_ID, MemWrite_EX, MemWrite_MEM, MemRead_ID, MemRead_EX, MemRead_MEM: std_logic;
+signal Mem_ready: std_logic; -- Vale 1 si operación se completa en el ciclo actual
 signal PC_in, PC_out, four, PC4, Dirsalto_ID, IR_in, IR_ID, PC4_ID, inm_ext_EX, ALU_Src_out, cero : std_logic_vector(31 downto 0);
 signal BusW, BusA, BusB, BusA_EX, BusB_EX, BusB_MEM, inm_ext, inm_ext_x4, ALU_out_EX, ALU_out_MEM, ALU_out_WB, Mem_out, MDR : std_logic_vector(31 downto 0);
 signal RW_EX, RW_MEM, RW_WB, Reg_Rs_ID, Reg_Rs_EX, Reg_Rt_ID, Reg_Rd_EX, Reg_Rt_EX: std_logic_vector(4 downto 0);
@@ -265,13 +273,13 @@ signal ADD_FP_out, ALU_INT_out, Mux_A_out, Mux_B_out: std_logic_vector(31 downto
 signal IR_op_code: std_logic_vector(5 downto 0);
 signal FP_add_ID, FP_add_EX, FP_done, FP_mux: std_logic;
 signal MUX_ctrl_A, MUX_ctrl_B : std_logic_vector(1 downto 0);
-signal parar_EX, parar_ID, RegWrite_EX_mux_out, Kill_IF, reset_ID, load_ID, reset_EX, load_EX, reset_MEM, load_MEM : std_logic;
+signal parar_EX, parar_ID, parar_MEM, RegWrite_EX_mux_out, Kill_IF, reset_ID, load_ID, reset_EX, load_EX, reset_MEM, load_MEM, reset_WB, load_WB : std_logic;
 begin
 pc: reg32 port map (	Din => PC_in, clk => clk, reset => reset, load => load_PC, Dout => PC_out);
 ------------------------------------------------------------------------------------
 -- load_PC vale '1' porque en la versión actual el procesador no para nunca
 -- Si queremos detener una instrucción en la etapa fetch habrá que ponerlo a '0'
-load_PC <= not (parar_EX or parar_ID); 
+load_PC <= not (parar_ID or parar_EX or parar_MEM); 
 ------------------------------------------------------------------------------------
 -- constantes que se usan en el código;
 four <= "00000000000000000000000000000100";
@@ -291,7 +299,7 @@ Mem_I: memoriaRAM_I PORT MAP (CLK => CLK, ADDR => PC_out, Din => cero, WE => '0'
 reset_ID <= reset or Kill_IF;
 -- load_ID vale '1' porque en la versión actual el procesador no para nunca
 -- Si queremos detener una instrucción en la etapa fetch habrá que ponerlo a '0'
-load_ID <= not (Kill_IF or parar_EX or parar_ID);
+load_ID <= not (Kill_IF or parar_ID or parar_EX or parar_MEM);
 -- Registros que separan las etapas IF e ID
 Banco_IF_ID: Banco_ID port map (	IR_in => IR_in, PC4_in => PC4, clk => clk, reset => reset_ID, load => load_ID, IR_ID => IR_ID, PC4_ID => PC4_ID);
 --
@@ -320,7 +328,8 @@ Z <= '1' when (busA=busB) else '0';
 
 Unidad_detencion_riesgos: UD port map (	Reg_Rs_ID => Reg_Rs_ID, Reg_Rt_ID => Reg_Rt_ID, MemRead_EX => MemRead_EX, RW_EX => RW_EX, RegWrite_EX => RegWrite_EX,
 										RW_Mem => RW_Mem, RegWrite_Mem => RegWrite_Mem, IR_op_code => IR_op_code, PCSrc => PCSrc, FP_add_EX => FP_add_EX, FP_done => FP_done,
-										kill_IF => kill_IF, parar_ID => parar_ID, parar_EX => parar_EX );
+                    MemWrite_MEM => MemWrite_MEM, MemRead_MEM => MemRead_MEM, Mem_ready => Mem_ready,
+										kill_IF => kill_IF, parar_ID => parar_ID, parar_EX => parar_EX, parar_MEM => parar_MEM );
 -------------------------------------------------------------------------------------
 -- UC
 UC_seg: UC port map (IR_op_code => IR_op_code, Branch => Branch, RegDst => RegDst_ID,  ALUSrc => ALUSrc_ID, MemWrite => MemWrite_ID,  
@@ -334,8 +343,8 @@ PCSrc <= Branch AND Z;
 ALUctrl_ID <= IR_ID(2 downto 0) when IR_op_code= ARIT else "000"; 
 -- load_EX vale '1' porque en la versión actual el procesador no para nunca
 -- Si queremos detener una instrucción en la etapa fetch habrá que ponerlo a '0'y pensar qué se envía a la etapa siguiente
-load_EX <= not (parar_EX or parar_ID);
-reset_EX <= reset or (parar_ID and not parar_EX);
+load_EX <= not (parar_ID or parar_EX or parar_MEM);
+reset_EX <= reset or (parar_ID and not (parar_EX or parar_MEM));
 -- Banco que separa las etapas de ID y EX
 Banco_ID_EX: Banco_EX PORT MAP ( clk => clk, reset => reset_EX, load => load_EX, busA => busA, busB => busB, busA_EX => busA_EX, busB_EX => busB_EX,
 											RegDst_ID => RegDst_ID, ALUSrc_ID => ALUSrc_ID, MemWrite_ID => MemWrite_ID, MemRead_ID => MemRead_ID,
@@ -382,8 +391,8 @@ mux_dst: mux2_5bits port map (Din0 => Reg_Rt_EX, DIn1 => Reg_Rd_EX, ctrl => RegD
 -----------
 -- Banco que separa las etapas de EX y Mem
 -- NOTA:Si paramos en EX por una operación de FP habrá que pensar qué se envía a la siguiente etapa
-reset_MEM <= reset or parar_EX;
-load_MEM <= not parar_EX;
+reset_MEM <= reset or (parar_EX and not parar_MEM);
+load_MEM <= not (parar_EX or parar_MEM);
 Banco_EX_MEM: Banco_MEM PORT MAP ( ALU_out_EX => ALU_out_EX, ALU_out_MEM => ALU_out_MEM, clk => clk, reset => reset_MEM, load => load_MEM, MemWrite_EX => MemWrite_EX,
 												MemRead_EX => MemRead_EX, MemtoReg_EX => MemtoReg_EX, RegWrite_EX => RegWrite_EX, MemWrite_MEM => MemWrite_MEM, MemRead_MEM => MemRead_MEM,
 												MemtoReg_MEM => MemtoReg_MEM, RegWrite_MEM => RegWrite_MEM, 
@@ -393,9 +402,11 @@ Banco_EX_MEM: Banco_MEM PORT MAP ( ALU_out_EX => ALU_out_EX, ALU_out_MEM => ALU_
 ------------------------------------------Etapa MEM-------------------------------------------------------------------
 --
 -- Memoria de datos
-Mem_D: memoriaRAM_D PORT MAP (CLK => CLK, ADDR => ALU_out_MEM, Din => BusB_MEM, WE => MemWrite_MEM, RE => MemRead_MEM, Dout => Mem_out);
+Mem_D: MD_mas_MC PORT MAP (CLK => CLK, reset => reset, ADDR => ALU_out_MEM, Din => BusB_MEM, WE => MemWrite_MEM, RE => MemRead_MEM, Mem_ready => Mem_ready, Dout => Mem_out);
 -- Banco que separa las etapas de Mem y WB
-Banco_MEM_WB: Banco_WB PORT MAP ( ALU_out_MEM => ALU_out_MEM, ALU_out_WB => ALU_out_WB, Mem_out => Mem_out, MDR => MDR, clk => clk, reset => reset, load => '1', MemtoReg_MEM => MemtoReg_MEM, RegWrite_MEM => RegWrite_MEM, 
+reset_WB <= reset;
+load_WB <= not parar_MEM;
+Banco_MEM_WB: Banco_WB PORT MAP ( ALU_out_MEM => ALU_out_MEM, ALU_out_WB => ALU_out_WB, Mem_out => Mem_out, MDR => MDR, clk => clk, reset => reset_WB, load => load_WB, MemtoReg_MEM => MemtoReg_MEM, RegWrite_MEM => RegWrite_MEM, 
 											MemtoReg_WB => MemtoReg_WB, RegWrite_WB => RegWrite_WB, RW_MEM => RW_MEM, RW_WB => RW_WB );
 -- Mux para elegir entre la salida de memoria y la de la ALU 
 mux_busW: mux2_1 port map (Din0 => ALU_out_WB, DIn1 => MDR, ctrl => MemtoReg_WB, Dout => busW);
