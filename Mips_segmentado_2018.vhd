@@ -126,6 +126,15 @@ component UD is
 			Parar_EX		: out  STD_LOGIC); -- Indica que las etapas EX y previas deben parar
 end component;
 
+component counter is
+    Port ( clk : in  STD_LOGIC;
+           reset : in  STD_LOGIC;
+           count_enable : in  STD_LOGIC;
+           load : in  STD_LOGIC;
+           D_in  : in  STD_LOGIC_VECTOR (7 downto 0);
+       count : out  STD_LOGIC_VECTOR (7 downto 0));
+end component;
+
 COMPONENT Banco_EX
     PORT(
          clk : IN  std_logic;
@@ -265,7 +274,9 @@ signal ADD_FP_out, ALU_INT_out, Mux_A_out, Mux_B_out: std_logic_vector(31 downto
 signal IR_op_code: std_logic_vector(5 downto 0);
 signal FP_add_ID, FP_add_EX, FP_done, FP_mux: std_logic;
 signal MUX_ctrl_A, MUX_ctrl_B : std_logic_vector(1 downto 0);
-signal parar_EX, parar_ID, RegWrite_EX_mux_out, Kill_IF, reset_ID, load_ID, reset_EX, load_EX, reset_MEM, load_MEM : std_logic;
+signal parar_EX, parar_ID, parar_MEM, RegWrite_EX_mux_out, Kill_IF, reset_ID, load_ID, reset_EX, load_EX, reset_MEM, load_MEM, reset_WB, load_WB : std_logic;
+signal Parar_datos, Parar_control, Parar_FP, Parar_memoria : std_logic;
+signal paradas_control, paradas_datos, paradas_FP, paradas_memoria : std_logic_vector (7 downto 0);
 begin
 pc: reg32 port map (	Din => PC_in, clk => clk, reset => reset, load => load_PC, Dout => PC_out);
 ------------------------------------------------------------------------------------
@@ -320,7 +331,16 @@ Z <= '1' when (busA=busB) else '0';
 
 Unidad_detencion_riesgos: UD port map (	Reg_Rs_ID => Reg_Rs_ID, Reg_Rt_ID => Reg_Rt_ID, MemRead_EX => MemRead_EX, RW_EX => RW_EX, RegWrite_EX => RegWrite_EX,
 										RW_Mem => RW_Mem, RegWrite_Mem => RegWrite_Mem, IR_op_code => IR_op_code, PCSrc => PCSrc, FP_add_EX => FP_add_EX, FP_done => FP_done,
-										kill_IF => kill_IF, parar_ID => parar_ID, parar_EX => parar_EX );
+                    MemWrite_MEM => MemWrite_MEM, MemRead_MEM => MemRead_MEM, Mem_ready => Mem_ready,
+										kill_IF => kill_IF, parar_ID => parar_ID, parar_EX => parar_EX, parar_MEM => parar_MEM );
+Parar_control <= kill_IF;
+Count_control: counter port map (clk => clk, reset => reset, count_enable => Parar_control, load => '0', D_in => "00000000", count => paradas_control);
+Parar_datos <= parar_ID and not (parar_EX or parar_MEM);
+Count_datos: counter port map (clk => clk, reset => reset, count_enable => Parar_datos, load => '0', D_in => "00000000", count => paradas_datos);
+Parar_FP <= parar_EX and not parar_MEM;
+Count_FP: counter port map (clk => clk, reset => reset, count_enable => Parar_FP, load => '0', D_in => "00000000", count => paradas_FP);
+Parar_memoria <= parar_MEM;
+Count_memoria: counter port map (clk => clk, reset => reset, count_enable => Parar_memoria, load => '0', D_in => "00000000", count => paradas_memoria);
 -------------------------------------------------------------------------------------
 -- UC
 UC_seg: UC port map (IR_op_code => IR_op_code, Branch => Branch, RegDst => RegDst_ID,  ALUSrc => ALUSrc_ID, MemWrite => MemWrite_ID,  
