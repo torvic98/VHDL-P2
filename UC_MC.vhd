@@ -38,6 +38,7 @@ entity UC_MC is
 			dirty_bit : in  STD_LOGIC; --avisa si el bloque a reemplazar es sucio
 			bus_TRDY : in  STD_LOGIC; --indica que la memoria no puede realizar la operación solicitada en este ciclo
 			Bus_DevSel: in  STD_LOGIC; --indica que la memoria ha reconocido que la dirección está dentro de su rango
+			palabra_pedida : in STD_LOGIC_VECTOR (1 downto 0); --indica la palabra que solicita el procesador
 			MC_RE : out  STD_LOGIC; --RE y WE de la MC
             MC_WE : out  STD_LOGIC;
             bus_RE : out  STD_LOGIC; --RE y WE de la MC
@@ -51,7 +52,11 @@ entity UC_MC is
             Frame : out  STD_LOGIC; --indica que la operación no ha terminado
 			Send_dirty	: out  STD_LOGIC; --indica que hay que enviar el bloque sucio por el bus
 			Update_dirty	: out  STD_LOGIC; --indica que hay que actualizar el bit dirty
-			Replace_block	: out  STD_LOGIC -- indica que se ha reemplzado un bloque
+			Replace_block	: out  STD_LOGIC; -- indica que se ha reemplzado un bloque
+			load_addr	: out STD_LOGIC; -- cargar direccion y operación desde mips
+			load_data	: out STD_LOGIC; -- cargar dato de entrada desde mips
+			mips_origen	: out STD_LOGIC; -- indica si se utilizan los datos procedentes del mips o los guardados
+           	mux_out : out STD_LOGIC -- indica qué dato se envía al procesador, el que procede del BUS o el almacenado en la MC
            );
 end UC_MC;
 
@@ -70,6 +75,7 @@ signal state, next_state : state_type;
 signal last_word: STD_LOGIC; --se activa cuando se está pidiendo la última palabra de un bloque
 signal count_enable: STD_LOGIC; -- se activa si se ha recibido una palabra de un bloque para que se incremente el contador de palabras
 signal palabra_UC : STD_LOGIC_VECTOR (1 downto 0);
+signal match_word : STD_LOGIC; -- se activa se la palabra recibida es la que solicita el procesador
 begin
  
  
@@ -77,6 +83,7 @@ begin
 word_counter: counter_2bits port map (clk, reset, count_enable, palabra_UC); --indica la palabra actual dentro de una transferencia de bloque (1ª, 2ª...)
 
 last_word <= '1' when palabra_UC="11" else '0';--se activa cuando estamos pidiendo la última palabra
+match_word <= '1' when palabra_UC=palabra_pedida else '0'; -- se activa se la palabra recibida es la que solicita el procesador
 
 palabra <= palabra_UC;
 
@@ -92,7 +99,7 @@ palabra <= palabra_UC;
    end process;
  
    --MEALY State-Machine - Outputs based on state and inputs
-   OUTPUT_DECODE: process (state, hit, last_word, bus_TRDY, RE, WE, dirty_bit, Bus_DevSel)
+   OUTPUT_DECODE: process (state, hit, last_word, bus_TRDY, RE, WE, dirty_bit, Bus_DevSel, match_word)
    begin
 			  -- valores por defecto, si no se asigna otro valor en un estado valdrán lo que se asigna aquí
 		MC_WE <= '0';
@@ -109,18 +116,24 @@ palabra <= palabra_UC;
 		Frame <= '0';
 		Send_dirty <= '0';
 		Update_dirty <= '0';
-		Replace_block <= '0';	
+		Replace_block <= '0';
+		load_addr <= '0';
+		load_data <= '0';
+		mips_origen	 <= '0';
+		mux_out <= '0';
 			
 -- ESTADO INICIAL
 		-- No piden hacer nada          
         if (state = Inicio and RE= '0' and WE= '0') then
 			next_state <= Inicio;
+			mips_origen <= '1';
 
 		-- Read, hit, clean
 		elsif (state = Inicio and RE= '1' and hit= '1') then
 			next_state <= Inicio;
 			MC_RE <= '1';
 			ready <= '1';
+			mips_origen <= '1';
 
 		-- Write, hit, clean	
 		elsif (state = Inicio and WE= '1' and hit= '1') then
@@ -128,6 +141,7 @@ palabra <= palabra_UC;
 			MC_WE <= '1';
 			ready <= '1';
 			Update_dirty <= '1';
+			mips_origen <= '1';
 
 		-- Petición de Fetch. Esperando inicio de conexión con SLAVE.
 		-- Read/Write, miss, clean, NO DevSel
@@ -136,6 +150,10 @@ palabra <= palabra_UC;
 			bus_RE <= '1';
 			MC_send_addr <= '1';
 			Frame <= '1';
+			mips_origen <= '1';
+			load_addr <= '1';
+			load_data <= WE; -- Sólo en caso de escritura
+			ready <= WE; -- Sólo en caso de escritura
 
 		-- Petición de Fetch. SLAVE responde en el mismo ciclo.
 		-- Read/Write, miss, clean, SI DevSel
@@ -143,6 +161,10 @@ palabra <= palabra_UC;
 			next_state <= RP;
 			bus_RE <= '1';
 			Frame <= '1';
+			mips_origen <= '1';
+			load_addr <= '1';
+			load_data <= WE; -- Sólo en caso de escritura
+			ready <= WE; -- Sólo en caso de escritura
 
 		-- Petición de Copy-Back. Esperando inicio de conexión con SLAVE.
 		-- Read/Write, miss, dirty, NO DevSel (esperando inicio de conexión con SLAVE)
@@ -152,14 +174,22 @@ palabra <= palabra_UC;
 			MC_send_addr <= '1';
 			Frame <= '1';
 			Send_dirty <= '1';
+			mips_origen <= '1';
+			load_addr <= '1';
+			load_data <= WE; -- Sólo en caso de escritura
+			ready <= WE; -- Sólo en caso de escritura
 
 		-- Petición de Copy-Back. SLAVE responde en el mismo ciclo.
 		-- Miss, dirty, SI DevSel
-		elsif (state = inicio and (RE='1' or WE='1') and hit= '0' and dirty_bit= '1' and Bus_DevSel= '1') then
+		elsif (state = Inicio and (RE='1' or WE='1') and hit= '0' and dirty_bit= '1' and Bus_DevSel= '1') then
 			next_state <= CB;
 			bus_WE <= '1';
 			Frame <= '1';
 			Send_dirty <= '1';
+			mips_origen <= '1';
+			load_addr <= '1';
+			load_data <= WE; -- Sólo en caso de escritura
+			ready <= WE; -- Sólo en caso de escritura
 
 -- ESTADO CB_init ()
 -- Esperando inicio de Copy-Back con SLAVE
@@ -250,7 +280,7 @@ palabra <= palabra_UC;
 
 		-- SLAVE NO preparado AND palabra < 3
 		-- SI TRDY, NO last_word
-		elsif (state = RP and bus_TRDY= '1' and last_word= '0') then
+		elsif (state = RP and bus_TRDY= '1' and last_word= '0' and match_word='0') then
 			next_state <= RP;
 			MC_WE <= '1';
 			bus_RE <= '1';
@@ -258,9 +288,22 @@ palabra <= palabra_UC;
 			Frame <= '1';
 			count_enable <= '1';
 
+
+		-- SLAVE NO preparado AND palabra < 3 AMD match
+		-- SI TRDY, NO last_word, match_word
+		elsif (state = RP and bus_TRDY= '1' and last_word= '0' and match_word='1') then
+			next_state <= RP;
+			MC_WE <= '1';
+			bus_RE <= '1';
+			mux_origen <= '1';
+			Frame <= '1';
+			count_enable <= '1';
+			mux_out <= RE; -- Sólo en lectura
+			ready <= RE; -- Sólo en lectura
+
 		-- SLAVE NO preparado AND palabra == 3
-		-- SI TRDY, SI last_word
-		elsif (state = RP and bus_TRDY= '1' and last_word= '1') then
+		-- SI TRDY, SI last_word, NO match_word
+		elsif (state = RP and bus_TRDY= '1' and last_word= '1' and match_word='0') then
 			next_state <= RP_end;
 			MC_WE <= '1';
 			bus_RE <= '1';
@@ -271,19 +314,31 @@ palabra <= palabra_UC;
 			Frame <= '1';
 			count_enable <= '1';
 
+		-- SLAVE NO preparado AND palabra == 3 AND match
+		-- SI TRDY, SI last_word, match_word
+		elsif (state = RP and bus_TRDY= '1' and last_word= '1' and match_word='1') then
+			next_state <= RP_end;
+			MC_WE <= '1';
+			bus_RE <= '1';
+			MC_tags_WE <= '1';
+			mux_origen <= '1';
+			Update_dirty <= '1';
+			Replace_block <= '1';
+			Frame <= '1';
+			count_enable <= '1';
+			mux_out <= RE; -- Sólo en lectura
+			ready <= RE; -- Sólo en lectura
+
 -- ESTADO RP_end
 -- Repetir accesos a caché
 		-- REPETIR lectura
 		elsif (state = RP_end and RE= '1') then
 			next_state <= Inicio;
-			MC_RE <= '1';
-			ready <= '1';
 
 		-- REPETIR escritura
 		elsif (state = RP_end and WE= '1') then
 			next_state <= Inicio;
 			MC_WE <= '1';
-			ready <= '1';
 			Update_dirty <= '1';
 
 		end if;
