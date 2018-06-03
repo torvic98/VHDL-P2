@@ -57,7 +57,7 @@ component UC_MC is
 			dirty_bit : in  STD_LOGIC; --avisa si el bloque a reemplazar es sucio
 			bus_TRDY : in  STD_LOGIC; --indica que la memoria no puede realizar la operación solicitada en este ciclo
 			Bus_DevSel: in  STD_LOGIC; --indica que la memoria ha reconocido que la dirección está dentro de su rango
-			palabra_pedida : in STD_LOGIC_VECTOR (1 downto 0); --indica la palabra que solicita el procesador
+			match_word : in STD_LOGIC; --indica que la palabra que solicita el procesador es la que se estça leyendo del bus
 			MC_RE : out  STD_LOGIC; --RE y WE de la MC
             MC_WE : out  STD_LOGIC;
             bus_RE : out  STD_LOGIC; --RE y WE de la MC
@@ -110,8 +110,8 @@ signal palabra_UC: std_logic_vector(1 downto 0); --se usa al traer un bloque nue
 signal dir_MC: std_logic_vector(3 downto 0); -- se usa para leer/escribir las datos almacenas en al MC. 
 signal MC_Din, MC_Dout: std_logic_vector (31 downto 0);
 signal MC_Tags_Dout: std_logic_vector(25 downto 0); 
-signal mux_out, mips_origen, load_addr, load_data, RE_UC, WE_UC: std_logic; -- Para anticipación de palabra y buffer de entrada
-signal ADDR_UC, Din_UC, ADDR_reg_out, Din_reg_out: std_logic_vector (31 downto 0);
+signal mux_out, mips_origen, load_addr, load_data, RE_UC, WE_UC, match_word: std_logic; -- Para anticipación de palabra y buffer de entrada
+signal ADDR_UC, Din_UC, ADDR_reg_out, Din_reg_out, MC_Bus_ADDR_UC: std_logic_vector (31 downto 0);
 signal RE_reg_in, WE_reg_in, RE_reg_out, WE_reg_out: std_logic_vector (3 downto 0);
 begin
  -------------------------------------------------------------------------------------------------- 
@@ -184,14 +184,15 @@ Unidad_Control: UC_MC port map (	clk => clk, reset=> reset, RE => RE_UC, WE => W
 											dirty_bit => dirty_bit, bus_DevSel => bus_DevSel, MC_RE => MC_RE, MC_WE => MC_WE, bus_RE => MC_bus_RE, Replace_block => Replace_block,
 											bus_WE => int_bus_WE, MC_tags_WE=> MC_tags_WE, palabra => palabra_UC, mux_origen => mux_origen, 
 											ready => ready, MC_send_addr=>MC_send_addr, MC_send_data => MC_send_data, Frame => MC_Frame,
-											palabra_pedida => dir_palabra, load_addr => load_addr, load_data => load_data, mips_origen => mips_origen, mux_out => mux_out);  
+											match_word => match_word, load_addr => load_addr, load_data => load_data, mips_origen => mips_origen, mux_out => mux_out);  
 --------------------------------------------------------------------------------------------------
 ----------- Salidas para el bus
 -------------------------------------------------------------------------------------------------- 
 MC_bus_WE <= int_bus_WE;
 
-MC_Bus_ADDR <= 	ADDR_UC(31 downto 4)&"0000" when Send_dirty ='0' else 
+MC_Bus_ADDR_UC <= 	ADDR_UC(31 downto 4)&"0000" when Send_dirty ='0' else 
 				MC_Tags_Dout&dir_cjto&"0000"; --Si es fallo mandamos la dirección del bloque que causó el fallo, si es copy-back la del bloque reemplazado
+MC_Bus_ADDR <= MC_Bus_ADDR_UC;
 					 
 MC_Bus_data_out <= MC_Dout; -- se usa para mandar el dato a escribir
 --------------------------------------------------------------------------------------------------
@@ -214,5 +215,7 @@ RE_reg_in <= "000"&RE;
 RE_reg: reg4 port map (	Din => RE_reg_in, clk => clk, reset => reset, load => load_addr, Dout => RE_reg_out);
 WE_reg_in <= "000"&WE;
 WE_reg: reg4 port map (	Din => WE_reg_in, clk => clk, reset => reset, load => load_addr, Dout => WE_reg_out);
+
+match_word <= '1' when (ADDR=(MC_Bus_ADDR_UC(31 downto 4)&palabra_UC&"00")) else '0'; -- La plabra en el bus corresponde con la pedida por el procesador.
 
 end Behavioral;

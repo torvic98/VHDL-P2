@@ -38,7 +38,7 @@ entity UC_MC is
 			dirty_bit : in  STD_LOGIC; --avisa si el bloque a reemplazar es sucio
 			bus_TRDY : in  STD_LOGIC; --indica que la memoria no puede realizar la operación solicitada en este ciclo
 			Bus_DevSel: in  STD_LOGIC; --indica que la memoria ha reconocido que la dirección está dentro de su rango
-			palabra_pedida : in STD_LOGIC_VECTOR (1 downto 0); --indica la palabra que solicita el procesador
+			match_word : in STD_LOGIC; --indica que la palabra que solicita el procesador es la que se estça leyendo del bus
 			MC_RE : out  STD_LOGIC; --RE y WE de la MC
             MC_WE : out  STD_LOGIC;
             bus_RE : out  STD_LOGIC; --RE y WE de la MC
@@ -75,7 +75,6 @@ signal state, next_state : state_type;
 signal last_word: STD_LOGIC; --se activa cuando se está pidiendo la última palabra de un bloque
 signal count_enable: STD_LOGIC; -- se activa si se ha recibido una palabra de un bloque para que se incremente el contador de palabras
 signal palabra_UC : STD_LOGIC_VECTOR (1 downto 0);
-signal match_word : STD_LOGIC; -- se activa se la palabra recibida es la que solicita el procesador
 begin
  
  
@@ -83,7 +82,6 @@ begin
 word_counter: counter_2bits port map (clk, reset, count_enable, palabra_UC); --indica la palabra actual dentro de una transferencia de bloque (1ª, 2ª...)
 
 last_word <= '1' when palabra_UC="11" else '0';--se activa cuando estamos pidiendo la última palabra
-match_word <= '1' when palabra_UC=palabra_pedida else '0'; -- se activa se la palabra recibida es la que solicita el procesador
 
 palabra <= palabra_UC;
 
