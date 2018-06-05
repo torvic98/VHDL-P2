@@ -216,6 +216,6 @@ RE_reg: reg4 port map (	Din => RE_reg_in, clk => clk, reset => reset, load => lo
 WE_reg_in <= "000"&WE;
 WE_reg: reg4 port map (	Din => WE_reg_in, clk => clk, reset => reset, load => load_addr, Dout => WE_reg_out);
 
-match_word <= '1' when (ADDR=(MC_Bus_ADDR_UC(31 downto 4)&palabra_UC&"00")) else '0'; -- La plabra en el bus corresponde con la pedida por el procesador.
+match_word <= '1' when (ADDR_UC=(MC_Bus_ADDR_UC(31 downto 4)&palabra_UC&"00")) else '0'; -- La plabra en el bus corresponde con la pedida por el procesador.
 
 end Behavioral;
